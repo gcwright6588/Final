@@ -1,0 +1,240 @@
+---
+  title: "BIOS 6640 Final Project"
+author: "Garth Wright"
+date: "May 12, 2016"
+output: 
+  pdf_document: 
+  latex_engine: xelatex
+---
+  
+  Python Code
+#The Following Was performed inside Python version 2.7#
+================
+  # -*- coding: utf-8 -*-
+  
+  """
+
+Created on Wed Apr 20 15:41:15 2016
+
+
+
+@author: CarolineL
+
+"""
+
+
+
+#Import the necessary methods from tweepy library
+
+from tweepy.streaming import StreamListener
+
+from tweepy import OAuthHandler
+
+from tweepy import Stream
+
+
+
+#Variables that contains the user credentials to access Twitter API 
+
+access_token = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+access_token_secret = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+consumer_key = "XXXXXXXXXXXXXXXXXXXXXX"
+
+consumer_secret = "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
+
+
+
+
+
+#This is a basic listener that just prints received tweets to stdout.
+
+class StdOutListener(StreamListener):
+  
+  
+  
+  def on_data(self, data):
+  
+  #print data
+  
+  with open('users/caroline/twitproj/fetched_tweets.txt','a') as tf:
+  
+  tf.write(data)
+
+return True
+
+
+
+def on_error(self, status):
+  
+  print status
+
+
+
+if __name__ == '__main__':
+  
+  
+  
+  #This handles Twitter authetification and the connection to Twitter Streaming API
+  
+  l = StdOutListener()
+
+auth = OAuthHandler(consumer_key, consumer_secret)
+
+auth.set_access_token(access_token, access_token_secret)
+
+stream = Stream(auth, l)
+
+
+
+#This line filter Twitter Streams to capture data by the keywords: 'zika'
+
+stream.filter(track=['zika'])
+
+
+
+import json
+
+import pandas as pd
+
+
+
+tweets_data_path = 'fetched_tweets.txt'
+
+
+
+#reading data into an array
+
+tweets_data = []
+
+tweets_file = open(tweets_data_path, "r")
+
+for line in tweets_file:
+  
+  try:
+  
+  tweet = json.loads(line)
+
+tweets_data.append(tweet)
+
+except:
+  
+  continue
+
+
+
+#converting into a dataframe
+
+tweets = pd.DataFrame()
+
+
+
+#selecting variables of interest out
+
+tweets['creation time'] = map(lambda tweet: tweet.get('created_at', None), tweets_data)
+
+tweets['timestamp'] = map(lambda tweet: tweet.get('timestamp_ms', None), tweets_data)
+
+tweets['user id'] = map(lambda tweet: tweet.get('user',{}).get('id') if tweet.get('user', None) != None else None, tweets_data)
+
+tweets['text'] = map(lambda tweet: tweet.get('text', None), tweets_data)
+
+tweets['lang'] = map(lambda tweet: tweet.get('lang', None), tweets_data)
+
+tweets['country'] = map(lambda tweet: tweet.get('place',{}).get('country') if tweet.get('place', None) != None else None, tweets_data)
+
+tweets['city'] = map(lambda tweet: tweet.get('place',{}).get('name') if tweet.get('place', None) != None else None, tweets_data)
+
+
+
+
+
+#writing to a csv using a codec which can read the data correctly
+
+tweets.to_csv(path_or_buf="/Users/AaronMauner/Google Drive/UCD Spring '16/R and Python/Data Project/tweetsparsed.csv",na_rep="NA",encoding='utf-8')
+
+
+
+
+Database Management
+===================
+  ```{r Data_management, warning=FALSE, tidy=FALSE, error=FALSE,echo=FALSE, message=FALSE}
+#Reading in the data from a txt file#
+tweets <- read.csv("~/Desktop/BIOS 6640 /Final Project/tweetsparsed.csv")
+#Loading necessary libraries#
+library(plyr)
+library(ggmap)
+library(maps)
+library(ggplot2)
+library(knitr)
+#Creating variable for each day of tweets#
+tweets$day <- substr(tweets$creation.time, 0, 10)
+#Creating tweets2 dataset from original
+tweets2<-tweets
+#deleting anything that is abnormal from creation_time column#
+tweets_clean<-tweets2[grepl(" ", tweets2$day),]
+#creating real date information for plottiong#
+#These will automatically be sorted#
+tweets_clean$better_day <- as.Date(tweets_clean$day,
+                                   format = "%a %b %d")
+
+```
+
+Statistical Findings
+====================
+  ```{r stats,warning=FALSE,echo=FALSE, message = FALSE}
+#creating counts data set to plot count frequency against day#
+counts <- count(tweets_clean, "better_day")
+#Plotting line graph of counts versus day#
+plot(counts$better_day, counts$freq, type='l', xlab = "Day of Tweet", ylab=" Number of Tweets")
+
+
+#First pulling out count data per user id#
+user_stats <- count(tweets, "user.id")
+user_stats$user.id <-format(user_stats$user.id, scientific=FALSE) 
+#This will give summaries for number of tweets per user id over the two week period#
+user_table <-summary(user_stats)
+kable(user_table, title="User Summary Statistics")
+#showing that most users only tweeted once regarding the virus#
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+Mode(user_stats$freq)
+count(user_stats$freq)
+
+#producing frequencies of tweets per language#
+user_lang <- count(tweets, "lang")
+#Adding percentage column#
+user_lang$Pct <- user_lang$freq / sum(user_lang$freq)
+user_lang$Pct <-format(user_lang$Pct, scientific=FALSE)
+#converting to numeric to double check that percentages add to 1#
+user_lang$Pct <-as.numeric(user_lang$Pct)
+#verifying distribution#
+sum(user_lang$Pct)
+#writing to results to csv for easy table import into Microsoft Word#
+write.csv(user_lang, file="~/Desktop/BIOS 6640 /Final Project/languages.csv")
+
+#gathering data on how many users reported a country#
+user_country <- count(tweets, "country")
+user_country$Pct <-user_country$freq / sum(user_country$freq)
+user_country$Pct <- format(user_country$Pct, scientific=FALSE)
+user_country
+#Writing to CSV for easy table import into word document#
+#Note: Kable knitting was not formatting all the asian countries properly with Latex#
+write.csv(user_country, file= "~/Desktop/BIOS 6640 /Final Project/countries.csv")
+
+```
+
+
+Appendix 
+========
+  ```{r Session_Info, warning=FALSE}
+sessionInfo()
+
+```
+
+
+
+
